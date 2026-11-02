@@ -116,8 +116,39 @@ DockWithRetry = IfThenElse(HasStation) → docking → RetryUntilSuccessful(3) �
 
 ### Groot·작업 로그
 
-- `groot_port`를 주면 BehaviorTree.CPP ZMQ 퍼블리셔를 띄운다 (Groot 1 "Monitor" → 포트 `groot_port`/`groot_port+1`). 로봇마다 다른 포트
+- `groot_port`를 주면 BehaviorTree.CPP ZMQ 퍼블리셔를 띄운다 (Groot 1 "Monitor" → 포트 `groot_port`/`groot_port+1`). 로봇마다 다른 포트. launch 인자 `groot_port`로도 준다
 - `task_log_file`을 주면 작업이 끝날 때마다 CSV 한 줄: `robot_id, task_id, task_type, item_type, state, phase, error_code, error_message, start_s, end_s, duration_s, distance_m, battery_percent` (명세 8장 작업 로그 필드)
+
+### Groot 시각화 (명세 8장 "BT 구조를 Groot으로 시각화")
+
+BehaviorTree.CPP v3라 **Groot 1**을 쓴다 (Groot2의 실시간 모니터는 v4 전용). 이미지에 없어서 gui 컨테이너에서 빌드한다.
+
+```bash
+# 0. gui 컨테이너 (noVNC http://localhost:6080/vnc.html, 비밀번호 ros)
+docker compose --profile gui up -d gui gui-proxy
+docker compose --profile gui exec gui bash
+# 1. Groot 1 빌드 (처음 한 번, 컨테이너를 내리면 지워진다)
+bash /ros2_ws/src/task/amr_bt/tools/build_groot.sh
+# 2. 우리 패키지 빌드
+source /opt/ros/humble/setup.bash && cd /ros2_ws && colcon build --packages-up-to amr_bt amr_fleet_manager && source install/setup.bash
+# 3. 터미널 1: Fleet 서버 / 터미널 2: 로봇 1대 (Groot 포트 1666·1667, sim 없이)
+ros2 launch amr_fleet_manager fleet_manager.launch.py
+ros2 launch amr_bt amr_bt.launch.py namespace:=amr_01 use_sim_time:=false groot_port:=1666
+# 4. 터미널 3: Groot (noVNC 화면에 뜬다)
+source /tmp/groot_ws/install/setup.bash && ros2 run groot Groot
+#    Editor → Load Tree → install/amr_bt/share/amr_bt/behavior_trees/task_cycle.xml : 트리 구조 캡처
+#    Monitor → Server IP localhost, Publisher 1666, Server 1667 → Connect
+# 5. 터미널 4: 작업을 넣으면 실행 중인 노드가 색으로 바뀐다 (RUNNING 노랑, SUCCESS 초록, FAILURE 빨강)
+ros2 topic pub --once /fleet/task_requests amr_msgs/msg/Task \
+  "{task_id: task_groot, task_type: 0, item_type: 1, pickup_station_id: dock_1, dropoff_station_id: rack_a4, pickup_pose: {position: {x: 5.0, y: 5.0}}, dropoff_pose: {position: {x: 20.0, y: 5.0}}}"
+```
+
+- sim 없이 돌리면 `MoveTo`·`Dock`은 자리채움(`use_nav2`·`use_docking` false)이라 몇 초씩 RUNNING 뒤 SUCCESS다. 단계 전환을 보기에는 충분하다. 실제 이동으로 보려면 sim·Nav2·도킹 서버를 띄우고 `use_sim_time:=true use_nav2:=true use_docking:=true`
+- 캡처: Editor 전체 트리(서브트리 `VisitStation` 펼침), Monitor에서 `move_to_pickup`·`docking` 진행 중 화면
+
+<!-- TODO(지수): 데스크톱에서 캡처해 docs/groot_editor.png, docs/groot_monitor.png로 넣고 아래 주석을 푼다 -->
+<!-- ![Groot Editor: task_cycle.xml](docs/groot_editor.png) -->
+<!-- ![Groot Monitor: 작업 진행 중](docs/groot_monitor.png) -->
 
 ### 도킹 (`Dock`, `DockWithRetry`)
 

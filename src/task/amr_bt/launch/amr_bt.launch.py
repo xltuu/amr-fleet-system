@@ -3,6 +3,7 @@
     ros2 launch amr_bt amr_bt.launch.py namespace:=amr_01
     ros2 launch amr_bt amr_bt.launch.py relayed:=true   # 장애 주입기 중계본(/<ns>/fleet/...) 구독
     ros2 launch amr_bt amr_bt.launch.py use_nav2:=true use_docking:=true   # 실제 이동·도킹 액션
+    ros2 launch amr_bt amr_bt.launch.py groot_port:=1666   # Groot 1 Monitor 연결 (README "Groot 시각화")
 
 서버 → 로봇: <prefix>/task_assignments, <prefix>/heartbeat (prefix: /fleet, relayed면 fleet)
 로봇 → 서버: /fleet/task_assignment_acks, /fleet/task_status, /fleet/robot_states
@@ -25,6 +26,7 @@ def _bt(context):
         'use_sim_time': LaunchConfiguration('use_sim_time').perform(context).lower() == 'true',
         'use_nav2': LaunchConfiguration('use_nav2').perform(context).lower() == 'true',
         'use_docking': LaunchConfiguration('use_docking').perform(context).lower() == 'true',
+        'groot_port': int(LaunchConfiguration('groot_port').perform(context)),
     }
     if relayed:
         overrides['server_topic_prefix'] = 'fleet'
@@ -53,5 +55,8 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_docking', default_value='false',
             description='true면 Dock이 docking/dock(Dock.action)을 호출한다. false면 자리채움'),
+        DeclareLaunchArgument(
+            'groot_port', default_value='0',
+            description='Groot 1 Monitor ZMQ 포트 (publisher = 이 값, server = 이 값 + 1). 0이면 끔. 로봇마다 다르게'),
         OpaqueFunction(function=_bt),
     ])
