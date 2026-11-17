@@ -119,8 +119,30 @@ def test_act1_second_zero_by_near_or_70s_after_the_queue():
 
 
 def test_scene12_second_zero_is_ok_without_a_position_condition():
-    scene, _ = run_scene(ds.load_scene(TASKS / 'demo_s12.yaml'), {3.0: assign_all})
-    assert scene.t0 == 3.5 and scene.t0_by == 'ok'
+    scene, _ = run_scene(ds.load_scene(TASKS / 'demo_s12.yaml'), {51.0: assign_all})
+    assert scene.t0 == 55.0 and scene.t0_by == 'ok'
+
+
+def without_at(steps):
+    """after.at_s를 뺀 장면 (시각 고정과 상관없는 단계 조건 시험용)."""
+    for step in steps:
+        step.after.pop('at_s', None)
+    return steps
+
+
+def test_at_s_waits_for_the_simulation_time_and_passes_if_already_late():
+    # 1-2는 켬·끔을 같은 손님 배치에서 비교하려고 시작 작업을 50 s, 0초를 55 s(시뮬레이션 시각)에 낸다
+    steps = ds.load_scene(TASKS / 'demo_s12.yaml')
+    assert steps[0].after == {'at_s': 50} and steps[1].after['at_s'] == 55
+    scene, out = run_scene(steps, {51.0: assign_all})
+    assert [o[0] for o in out if o[2].startswith('s12_busy')] == [50.0, 50.5]
+    assert (55.0, 't0', 's12_buffet2_t11') in out
+    # 기동이 늦어 장면이 60 s에 시작하면 기다리지 않는다 (0초는 할당 + 3 s)
+    scene = ds.Scene(ds.load_scene(TASKS / 'demo_s12.yaml'))
+    assert [a[0] for a in scene.tick(60.0, {})] == ['task']
+    table = {t: 'amr_x' for t in ('s12_busy_c01', 's12_busy_L04')}
+    assert scene.tick(60.5, table) and scene.tick(63.0, table) == []
+    assert ('t0', 63.5, 's12_buffet2_t11') in scene.tick(63.5, table)
 
 
 def test_condition_timeout_sends_anyway_and_logs_it():
@@ -268,7 +290,7 @@ def test_scene12_start_tasks_go_to_robots_4_and_5_and_the_request_to_robot_1():
 
 
 def test_scene12_request_is_sent_with_t0_after_the_two_start_tasks_are_assigned():
-    steps = ds.load_scene(TASKS / 'demo_s12.yaml')
+    steps = without_at(ds.load_scene(TASKS / 'demo_s12.yaml'))
     scene, out = run_scene(steps, {3.0: assign_all})
     # 마지막 시작 작업(0.5 s) 뒤 3 s, 그 전에(3.0 s) 둘 다 할당됐다
     assert (3.5, 't0', 's12_buffet2_t11') in out and (3.5, 'task', 's12_buffet2_t11') in out
@@ -382,7 +404,7 @@ def _server_table(events):
 def test_assigned_counts_tasks_already_in_progress_or_completed():
     # 표는 1 s마다라 할당(PENDING + assignee)을 못 보고 처음부터 IN_PROGRESS로, 또는 그새 끝나 COMPLETED로만 보일 수 있다.
     # 서버는 assignee를 끝까지 두므로 둘 다 할당으로 센다
-    steps = ds.load_scene(TASKS / 'demo_s12.yaml')
+    steps = without_at(ds.load_scene(TASKS / 'demo_s12.yaml'))
     events = _server_table({1.0: {'s12_busy_c01': ('amr_05', 1)},          # 처음 보인 상태가 IN_PROGRESS
                             2.0: {'s12_busy_L04': ('amr_04', 2)}})         # 처음 보인 상태가 COMPLETED
     scene, out = run_scene(steps, events)
@@ -392,7 +414,7 @@ def test_assigned_counts_tasks_already_in_progress_or_completed():
 
 def test_failed_task_back_in_queue_is_not_counted_until_reassigned():
     # 실패 뒤 다시 큐에 들어가면 서버가 assignee를 비운다 → 다시 할당될 때까지 기다린다
-    steps = ds.load_scene(TASKS / 'demo_s12.yaml')
+    steps = without_at(ds.load_scene(TASKS / 'demo_s12.yaml'))
     events = _server_table({1.0: {'s12_busy_c01': ('amr_05', 1), 's12_busy_L04': ('amr_04', 1)},
                             1.5: {'s12_busy_L04': ('', 0)},                   # 실패 → PENDING
                             10.0: {'s12_busy_L04': ('amr_03', 1)}})           # 다시 할당
@@ -405,7 +427,7 @@ def test_table_counts_and_record():
     states = {'a': 2, 'b': 0, 'c': 3}
     assert ds.table_counts(['a', 'b', 'c', 'd'], table, states) == {
         'sent': 4, 'assigned': 2, 'pending': 2, 'done': 1, 'failed': 1}
-    scene = ds.Scene(ds.load_scene(TASKS / 'demo_s12.yaml'))
+    scene = ds.Scene(without_at(ds.load_scene(TASKS / 'demo_s12.yaml')))
     scene.tick(0.0, {})
     scene.record(1.0, {'s12_busy_c01': 'amr_05'}, {'s12_busy_c01': 1})
     assert scene.log[-1] == {'t': 1.0, 'ev': 'count', 'sent': 1, 'assigned': 1, 'pending': 0, 'done': 0, 'failed': 0}

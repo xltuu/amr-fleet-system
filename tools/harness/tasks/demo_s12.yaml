@@ -13,14 +13,17 @@
 # 1-2 화면(서쪽)과 핵심 요청 자리(buffet_2, t11)에서 떨어져 있다.
 # path_m: 시작 자리 → 픽업 → 하역 A* (새 restaurant_gt)
 steps:
+  # 켬·끔을 같은 손님 배치에서 비교하려고 두 단계를 시뮬레이션 시각에 고정한다 (기동은 25~37 s에 끝난다.
+  # 11/17 녹화는 0초가 켬 28.5 s, 끔 40.0 s로 달라 매장 앞 손님이 달랐다)
   - name: busy
+    after: {at_s: 50}
     gap_s: 0.5
     tasks:
       - {id: s12_busy_c01, type: delivery, pickup: t15, dropoff: c01, path_m: 11.9}   # amr_04
       - {id: s12_busy_L04, type: delivery, pickup: L03, dropoff: L04, path_m: 8.1}    # amr_05
-  # 두 작업이 할당된 것을 작업표로 확인하고 3 s 뒤 = 0초 (/demo/t0)
+  # 두 작업이 할당되고 3 s 뒤, 그리고 시뮬레이션 55 s 이후 = 0초 (/demo/t0)
   - name: request
-    after: {assigned: 2, delay_s: 3, timeout_s: 60}
+    after: {assigned: 2, delay_s: 3, at_s: 55, timeout_s: 60}
     t0: true
     tasks:
       - {id: s12_buffet2_t11, type: delivery, pickup: stall_5, dropoff: t11}   # v3: 배식대 2번 자리(buffet_2)가 없어져 바로 동쪽 매장 5 (id는 유지)

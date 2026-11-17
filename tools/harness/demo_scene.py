@@ -12,6 +12,8 @@
   COMPLETED가 되어도 assignee_id를 그대로 두므로 그 작업도 센다. 실패 뒤 다시 큐에 들어가면(assignee_id 빔) 안 센다
 - after.pending: 이 장면이 낸 작업 중 아직 할당 안 된 작업이 N건 이상
 - after.delay_s: 앞 단계 마지막 작업을 낸 뒤 N s (시뮬레이션 시각)
+- after.at_s: 시뮬레이션 시각이 N s 이상 (절대 시각). 일과 손님(routine)은 시뮬레이션 시각대로 움직이므로, 켬·끔을
+  같은 손님 배치에서 비교하려면 0초 단계를 같은 시각에 낸다 (기동이 늦어 이미 지났으면 바로 맞는다)
 - after.near: {task: 작업 id, within_m: D} - 그 작업을 맡은 로봇(작업표 assignee_id)이 그 작업 하역 자리에서 D m 안에 있다
   (/fleet/robot_states 자세). 0초를 "그 로봇이 곧 비는 때"에 맞춘다 - 실제 속도(녹화에서 약 0.2 m/s)와 상관없이
   0초 직후 그 로봇이 일을 마친다
@@ -200,6 +202,7 @@ class Scene:
         waited = now - self.step_start
         ok = (assigned >= int(a.get('assigned', 0)) and pending >= int(a.get('pending', 0))
               and waited >= float(a.get('delay_s', 0.0))
+              and now >= float(a.get('at_s', 0.0))
               and ('near' not in a or self._near(a['near'], table, robots)))
         if ok:
             return 'ok'
